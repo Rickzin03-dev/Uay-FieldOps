@@ -1,0 +1,358 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  DESENVOLVEDOR
+  ADMIN
+  ALMOXARIFADO
+  DONO
+  GESTOR
+  TECNICO
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  BLOCKED
+}
+
+enum ItemType {
+  MATERIAL
+  FERRAMENTA
+  EPI
+  EQUIPAMENTO
+}
+
+enum ItemStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum MaterialControlType {
+  CONVENCIONAL
+  CABEAMENTO
+}
+
+enum MovementType {
+  ENTRADA
+  SAIDA
+  TRANSFERENCIA
+  DEVOLUCAO
+  AJUSTE
+  PERDA
+  AVARIA
+  BAIXA
+}
+
+enum Condition {
+  NOVO
+  BOM
+  USADO
+  DANIFICADO
+  MANUTENCAO
+  PERDIDO
+  BAIXADO
+}
+
+enum EquipmentUnitStatus {
+  EM_ESTOQUE
+  ALOCADO
+  EM_USO_CLIENTE
+  EM_CONFERENCIA
+  MANUTENCAO
+  AGUARDANDO_DEVOLUCAO
+  RESERVADO
+  DANIFICADO
+  DESCARTADO
+  DEVOLVIDO
+  BAIXADO
+}
+
+enum EquipmentUnitEventType {
+  ENTRADA
+  ALOCACAO
+  INSTALACAO
+  RETIRADA
+  CONFERENCIA
+  MANUTENCAO
+  DEVOLUCAO
+  BAIXA
+  AJUSTE
+}
+
+model User {
+  id String @id @default(uuid())
+  name String
+  email String? @unique
+  username String @unique
+  passwordHash String
+  phone String?
+  role UserRole @default(TECNICO)
+  status UserStatus @default(PENDING)
+  lastLoginAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  movements Movement[]
+  auditLogs AuditLog[]
+  resetTokens PasswordResetToken[]
+  technician Technician?
+  inventorySessions InventorySession[]
+  inventoryCounts InventoryCount[]
+  serviceOrders ServiceOrder[]
+  equipmentUnitEvents EquipmentUnitEvent[]
+}
+
+enum ServiceOrderStatus {
+  PENDENTE
+  REAGENDADA
+  EM_ANDAMENTO
+  FINALIZADA
+  CANCELADA
+}
+
+model PasswordResetToken {
+  id String @id @default(uuid())
+  tokenHash String @unique
+  expiresAt DateTime
+  usedAt DateTime?
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  @@index([userId, expiresAt])
+}
+
+model Technician {
+  id String @id @default(uuid())
+  name String
+  registration String? @unique
+  phone String?
+  position String?
+  team String?
+  active Boolean @default(true)
+  notes String?
+  userId String? @unique
+  user User? @relation(fields: [userId], references: [id])
+  balances StockBalance[]
+  movements Movement[]
+  serviceOrders ServiceOrder[]
+  equipmentUnits EquipmentUnit[]
+  equipmentUnitEvents EquipmentUnitEvent[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ServiceOrder {
+  id String @id @default(uuid())
+  number String @unique
+  customer String
+  contractId String?
+  address String?
+  serviceType String
+  description String?
+  status ServiceOrderStatus @default(FINALIZADA)
+  scheduledAt DateTime?
+  startedAt DateTime?
+  finishedAt DateTime?
+  durationMinutes Int?
+  pdfUrl String?
+  pdfName String?
+  powerMeterHome Decimal? @db.Decimal(8, 2)
+  powerMeterCto Decimal? @db.Decimal(8, 2)
+  materialsUsed Json?
+  evidences Json?
+  notes String?
+  archivedAt DateTime?
+  technicianId String
+  userId String
+  technician Technician @relation(fields: [technicianId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  equipmentUnits EquipmentUnit[]
+  equipmentUnitEvents EquipmentUnitEvent[]
+  @@index([technicianId, status])
+  @@index([technicianId, finishedAt])
+  @@index([status, finishedAt])
+}
+
+model Category {
+  id String @id @default(uuid())
+  name String @unique
+  subcategories Subcategory[]
+  items Item[]
+}
+
+model Subcategory {
+  id String @id @default(uuid())
+  name String
+  categoryId String
+  category Category @relation(fields: [categoryId], references: [id])
+  items Item[]
+  @@unique([categoryId, name])
+}
+
+model Item {
+  id String @id @default(uuid())
+  code String @unique
+  name String
+  type ItemType @default(MATERIAL)
+  serialized Boolean @default(false)
+  description String?
+  unit String @default("un")
+  quantity Decimal @default(0) @db.Decimal(14, 3)
+  materialControlType MaterialControlType @default(CONVENCIONAL)
+  metersPerUnit Decimal? @db.Decimal(14, 3)
+  availableMeters Decimal? @db.Decimal(14, 3)
+  minimum Decimal @default(0) @db.Decimal(14, 3)
+  maximum Decimal? @db.Decimal(14, 3)
+  manufacturer String?
+  model String?
+  serialNumber String? @unique
+  serialNumbers Json?
+  assetNumber String? @unique
+  barcode String? @unique
+  qrCode String? @unique
+  unitValue Decimal? @db.Decimal(14, 2)
+  location String?
+  condition Condition @default(BOM)
+  status ItemStatus @default(ACTIVE)
+  categoryId String
+  subcategoryId String?
+  category Category @relation(fields: [categoryId], references: [id])
+  subcategory Subcategory? @relation(fields: [subcategoryId], references: [id])
+  balances StockBalance[]
+  movements Movement[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  inventoryCounts InventoryCount[]
+  equipmentUnits EquipmentUnit[]
+  @@index([type, status])
+  @@index([name])
+}
+
+model StockBalance {
+  id String @id @default(uuid())
+  quantity Decimal @default(0) @db.Decimal(14, 3)
+  availableMeters Decimal? @db.Decimal(14, 3)
+  itemId String
+  technicianId String
+  item Item @relation(fields: [itemId], references: [id])
+  technician Technician @relation(fields: [technicianId], references: [id])
+  updatedAt DateTime @updatedAt
+  @@unique([itemId, technicianId])
+}
+
+model Movement {
+  id String @id @default(uuid())
+  type MovementType
+  quantity Decimal @db.Decimal(14, 3)
+  meters Decimal? @db.Decimal(14, 3)
+  itemId String
+  technicianId String?
+  userId String
+  origin String?
+  destination String?
+  reason String?
+  workOrder String?
+  customer String?
+  condition Condition?
+  notes String?
+  archivedAt DateTime?
+  createdAt DateTime @default(now())
+  item Item @relation(fields: [itemId], references: [id])
+  technician Technician? @relation(fields: [technicianId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+  @@index([createdAt, type])
+  @@index([technicianId])
+  @@index([technicianId, archivedAt, createdAt])
+}
+
+model AuditLog {
+  id String @id @default(uuid())
+  action String
+  entity String
+  entityId String?
+  metadata Json?
+  userId String?
+  user User? @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  @@index([createdAt, entity])
+}
+
+model InventorySession {
+  id String @id @default(uuid())
+  name String
+  status String @default("OPEN")
+  startedAt DateTime @default(now())
+  completedAt DateTime?
+  notes String?
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  counts InventoryCount[]
+  @@index([status, startedAt])
+}
+
+model InventoryCount {
+  id String @id @default(uuid())
+  systemQuantity Decimal @db.Decimal(14, 3)
+  physicalQuantity Decimal @db.Decimal(14, 3)
+  difference Decimal @db.Decimal(14, 3)
+  reason String
+  notes String?
+  countedAt DateTime @default(now())
+  sessionId String
+  itemId String
+  userId String
+  session InventorySession @relation(fields: [sessionId], references: [id])
+  item Item @relation(fields: [itemId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+  @@unique([sessionId, itemId])
+  @@index([countedAt])
+}
+
+// Cada equipamento com número de série vira um item individual e rastreável (não apenas quantidade agregada).
+model EquipmentUnit {
+  id String @id @default(uuid())
+  itemId String
+  serialNumber String @unique
+  status EquipmentUnitStatus @default(EM_ESTOQUE)
+  condition Condition @default(BOM)
+  technicianId String?
+  customer String?
+  contractId String?
+  serviceOrderId String?
+  notes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  item Item @relation(fields: [itemId], references: [id])
+  technician Technician? @relation(fields: [technicianId], references: [id])
+  serviceOrder ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+  events EquipmentUnitEvent[]
+  @@index([itemId, status])
+  @@index([technicianId])
+}
+
+// Linha do tempo por número de série: entrada, alocação, uso no cliente, devolução, baixa etc.
+model EquipmentUnitEvent {
+  id String @id @default(uuid())
+  unitId String
+  type EquipmentUnitEventType
+  technicianId String?
+  customer String?
+  contractId String?
+  serviceOrderId String?
+  userId String
+  notes String?
+  createdAt DateTime @default(now())
+  unit EquipmentUnit @relation(fields: [unitId], references: [id])
+  technician Technician? @relation(fields: [technicianId], references: [id])
+  serviceOrder ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+  @@index([unitId, createdAt])
+}

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 420" role="img" aria-labelledby="title desc">
+  <title id="title">Uay Internet</title>
+  <desc id="desc">Logo Uay Internet em azul e amarelo</desc>
+  <rect width="900" height="420" rx="18" fill="#07146f"/>
+  <g fill="#ffd51f" font-family="Arial, Helvetica, sans-serif" font-weight="700" text-anchor="middle">
+    <text x="450" y="220" font-size="172" letter-spacing="-8">UAY</text>
+    <rect x="145" y="258" width="610" height="9" rx="4"/>
+    <text x="450" y="355" font-size="92" letter-spacing="5">INTERNET</text>
+  </g>
+</svg>
